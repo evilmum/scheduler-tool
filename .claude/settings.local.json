@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx nuxi@latest init . --force --no-install)",
+      "Bash(npx nuxi@latest init . --force --no-install --template minimal)",
+      "Bash(npm install vuetify-nuxt-module vuetify @mdi/font bcryptjs nodemailer nuxt-auth-utils)",
+      "Bash(npm install --save-dev @types/bcryptjs @types/nodemailer)",
+      "Bash(node -e \"const bcrypt = require\\(''bcryptjs''\\); const hash = bcrypt.hashSync\\(''admin123'', 10\\); console.log\\(hash\\);\")"
+    ]
+  }
+}

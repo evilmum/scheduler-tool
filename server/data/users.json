@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "passwordHash": "$2b$10$5VmmSjnlOt/qW3sYq1FuNeH16Eg5P1v48dJEEqO/SOiZKoYm1azsW",
+    "email": "",
+    "globalRole": "admin",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "mmi8yka5e55smx51ts4",
+    "username": "Jonny",
+    "passwordHash": "$2b$10$zmkjDOUJQMusOXt7cXCydOAZTyabOH1raUG7r6MHLSgZI1Eo9iurC",
+    "email": "rampage1712@googlemail.com",
+    "globalRole": "admin",
+    "createdAt": "2026-03-08T21:11:02.189Z"
+  }
+]

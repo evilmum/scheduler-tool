@@ -1,0 +1,13 @@
+{
+  "discord": {
+    "token": "NjU1ODMzMjYzNjMzNTk2NDE2.XfaAeA.XVIS02OEAgeALMXRXM9KJgNs5Ks",
+    "channelId": "708457952083968060"
+  },
+  "smtp": {
+    "host": "",
+    "port": 587,
+    "user": "",
+    "password": "",
+    "from": ""
+  }
+}
