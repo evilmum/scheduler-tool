@@ -42,6 +42,14 @@ export interface DnDEvent {
   notificationMethod: 'discord' | 'email' | 'both' | 'none'
   createdAt: string
   archived: boolean
+  // Feature 3: allowed weekdays
+  allowedWeekdays: number[]   // 0=Sun,1=Mon,...,6=Sat. Empty = all allowed
+  dayExceptions: string[]     // specific dates that override allowedWeekdays
+  // Feature 4: per-event Discord channel
+  discordChannelId?: string
+  // Feature 6: reminders
+  reminderEnabled: boolean
+  reminderDaysBefore: number
 }
 
 export interface Settings {
@@ -58,8 +66,30 @@ export interface Settings {
   }
 }
 
+// Feature 1: ConfirmedDateEntry with location/time/cancel/reschedule
+export interface ConfirmedDateEntry {
+  date: string
+  location: string
+  startTime: string
+  endTime: string
+  cancelled: boolean
+  rescheduledFrom: string | null
+  rescheduledTo: string | null
+}
+
+// Feature 8: Absence
+export interface Absence {
+  id: string
+  start: string
+  end: string
+  note: string
+}
+
 export type Availabilities = Record<string, Record<string, string[]>>
-export type ConfirmedDates = Record<string, string[]>
+export type MaybeAvailabilities = Record<string, Record<string, string[]>>
+export type ConfirmedDates = Record<string, ConfirmedDateEntry[]>
+export type Absences = Record<string, Absence[]>
+export type SentReminders = Record<string, boolean>
 
 export async function getUsers(): Promise<User[]> {
   return readJSON<User[]>('users.json')
@@ -85,12 +115,36 @@ export async function saveAvailabilities(data: Availabilities): Promise<void> {
   return writeJSON('availabilities.json', data)
 }
 
+export async function getMaybeAvailabilities(): Promise<MaybeAvailabilities> {
+  return readJSON<MaybeAvailabilities>('maybe-availabilities.json')
+}
+
+export async function saveMaybeAvailabilities(data: MaybeAvailabilities): Promise<void> {
+  return writeJSON('maybe-availabilities.json', data)
+}
+
 export async function getConfirmedDates(): Promise<ConfirmedDates> {
   return readJSON<ConfirmedDates>('confirmed-dates.json')
 }
 
 export async function saveConfirmedDates(data: ConfirmedDates): Promise<void> {
   return writeJSON('confirmed-dates.json', data)
+}
+
+export async function getAbsences(): Promise<Absences> {
+  return readJSON<Absences>('absences.json')
+}
+
+export async function saveAbsences(data: Absences): Promise<void> {
+  return writeJSON('absences.json', data)
+}
+
+export async function getSentReminders(): Promise<SentReminders> {
+  return readJSON<SentReminders>('sent-reminders.json')
+}
+
+export async function saveSentReminders(data: SentReminders): Promise<void> {
+  return writeJSON('sent-reminders.json', data)
 }
 
 export async function getSettings(): Promise<Settings> {

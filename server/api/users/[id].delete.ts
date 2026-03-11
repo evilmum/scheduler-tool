@@ -11,9 +11,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'User not found' })
   }
 
+  const user = users[idx]
   // Prevent deleting the last admin
   const admins = users.filter(u => u.globalRole === 'admin')
-  if (admins.length === 1 && users[idx].globalRole === 'admin') {
+  if (admins.length === 1 && user!.globalRole === 'admin') {
     throw createError({ statusCode: 400, message: 'Cannot delete the last admin user' })
   }
 

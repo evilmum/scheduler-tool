@@ -1,5 +1,5 @@
 import { requireAuth } from '../../../utils/auth'
-import { getEvents, getAvailabilities, getUsers } from '../../../utils/db'
+import { getEvents, getAvailabilities, getMaybeAvailabilities, getUsers } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const sessionUser = await requireAuth(event)
@@ -18,17 +18,25 @@ export default defineEventHandler(async (event) => {
   }
 
   const availabilities = await getAvailabilities()
+  const maybeAvailabilities = await getMaybeAvailabilities()
   const users = await getUsers()
 
-  const eventAvailability = availabilities[id] || {}
+  const eventAvailability = availabilities[id!] || {}
+  const eventMaybe = maybeAvailabilities[id!] || {}
 
-  // Return with user info
-  const result = Object.entries(eventAvailability).map(([userId, dates]) => {
+  // Collect all userIds that have any availability
+  const allUserIds = new Set([
+    ...Object.keys(eventAvailability),
+    ...Object.keys(eventMaybe),
+  ])
+
+  const result = Array.from(allUserIds).map(userId => {
     const user = users.find(u => u.id === userId)
     return {
       userId,
       username: user?.username || 'Unknown',
-      dates,
+      dates: eventAvailability[userId] || [],
+      maybeDates: eventMaybe[userId] || [],
     }
   })
 

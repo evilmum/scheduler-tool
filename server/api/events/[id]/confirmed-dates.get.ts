@@ -18,5 +18,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const confirmedDates = await getConfirmedDates()
-  return { confirmedDates: confirmedDates[id] || [] }
+  return { confirmedDates: confirmedDates[id!] || [] }
 })

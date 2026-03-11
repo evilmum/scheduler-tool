@@ -1,10 +1,45 @@
 import nodemailer from 'nodemailer'
 import { getSettings } from './db'
-import type { DnDEvent, User } from './db'
+import type { DnDEvent, User, ConfirmedDateEntry } from './db'
 
 export async function sendConfirmationNotification(
   event: DnDEvent,
   date: string,
+  participants: User[],
+  entry?: ConfirmedDateEntry
+): Promise<void> {
+  const settings = await getSettings()
+  const method = event.notificationMethod
+
+  if (method === 'none') return
+
+  let message = `📅 DnD Session Confirmed!\n\nEvent: ${event.name}\nDate: ${date}`
+  if (entry?.location) message += `\nOrt: ${entry.location}`
+  if (entry?.startTime) message += `\nUhrzeit: ${entry.startTime}${entry.endTime ? ' – ' + entry.endTime : ''}`
+  message += '\n\nSee you there, adventurers!'
+
+  const promises: Promise<void>[] = []
+
+  // Feature 4: use per-event channelId if set, else fall back to global
+  const channelId = event.discordChannelId || settings.discord.channelId
+
+  if ((method === 'discord' || method === 'both') && settings.discord.token && channelId) {
+    promises.push(sendDiscordNotification(settings.discord.token, channelId, message))
+  }
+
+  if ((method === 'email' || method === 'both') && settings.smtp.host) {
+    const emails = participants.filter(p => p.email).map(p => p.email)
+    if (emails.length > 0) {
+      promises.push(sendEmailNotification(settings.smtp, emails, `DnD Session Confirmed: ${event.name}`, message))
+    }
+  }
+
+  await Promise.allSettled(promises)
+}
+
+export async function sendReminderNotification(
+  event: DnDEvent,
+  entry: ConfirmedDateEntry,
   participants: User[]
 ): Promise<void> {
   const settings = await getSettings()
@@ -12,18 +47,22 @@ export async function sendConfirmationNotification(
 
   if (method === 'none') return
 
-  const message = `📅 DnD Session Confirmed!\n\nEvent: ${event.name}\nDate: ${date}\n\nSee you there, adventurers!`
+  let message = `🔔 Erinnerung: DnD Session morgen!\n\nEvent: ${event.name}\nDatum: ${entry.date}`
+  if (entry.location) message += `\nOrt: ${entry.location}`
+  if (entry.startTime) message += `\nUhrzeit: ${entry.startTime}${entry.endTime ? ' – ' + entry.endTime : ''}`
+  message += '\n\nVergiss es nicht!'
 
   const promises: Promise<void>[] = []
+  const channelId = event.discordChannelId || settings.discord.channelId
 
-  if ((method === 'discord' || method === 'both') && settings.discord.token && settings.discord.channelId) {
-    promises.push(sendDiscordNotification(settings.discord.token, settings.discord.channelId, message))
+  if ((method === 'discord' || method === 'both') && settings.discord.token && channelId) {
+    promises.push(sendDiscordNotification(settings.discord.token, channelId, message))
   }
 
   if ((method === 'email' || method === 'both') && settings.smtp.host) {
     const emails = participants.filter(p => p.email).map(p => p.email)
     if (emails.length > 0) {
-      promises.push(sendEmailNotification(settings.smtp, emails, `DnD Session Confirmed: ${event.name}`, message))
+      promises.push(sendEmailNotification(settings.smtp, emails, `Erinnerung: ${event.name} morgen`, message))
     }
   }
 

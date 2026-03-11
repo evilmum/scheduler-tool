@@ -31,63 +31,144 @@
           :class="{
             'day-today': day.isToday,
             'day-past': day.isPast,
-            'day-available': day.isCurrentUserAvailable,
-            'day-qualified': day.meetsThreshold && !day.isConfirmed,
-            'day-confirmed': day.isConfirmed,
-            'day-clickable': !day.isPast,
+            'day-available': day.isCurrentUserAvailable && !day.isCurrentUserMaybe,
+            'day-maybe': day.isCurrentUserMaybe,
+            'day-qualified': day.meetsThreshold && !day.isConfirmed && !day.isCancelled,
+            'day-confirmed': day.isConfirmed && !day.isCancelled,
+            'day-cancelled': day.isCancelled,
+            'day-holiday': day.isHoliday,
+            'day-blocked': day.isBlocked,
+            'day-clickable': !day.isPast && !day.isBlocked,
           }"
-          @click="!day.isPast && toggleAvailability(day.dateStr)"
+          @click="!day.isPast && !day.isBlocked && toggleAvailability(day.dateStr)"
         >
           <div class="day-number text-caption">{{ day.dayNum }}</div>
           <div class="day-month text-caption text-medium-emphasis" v-if="day.showMonth">{{ day.monthStr }}</div>
 
-          <!-- Confirmed badge -->
-          <v-icon v-if="day.isConfirmed" color="success" size="small" class="confirmed-icon">mdi-star</v-icon>
+          <!-- Holiday indicator -->
+          <v-tooltip v-if="day.isHoliday" :text="day.holidayName" location="top">
+            <template #activator="{ props: tProps }">
+              <v-icon v-bind="tProps" color="amber-lighten-2" size="x-small" class="holiday-icon">mdi-church</v-icon>
+            </template>
+          </v-tooltip>
 
-          <!-- Avatar stack -->
-          <div class="avatar-stack" v-if="day.availableUsers.length > 0">
+          <!-- Confirmed badge (not cancelled) -->
+          <v-icon v-if="day.isConfirmed && !day.isCancelled" color="success" size="small" class="confirmed-icon">mdi-star</v-icon>
+
+          <!-- Cancelled badge -->
+          <v-icon v-if="day.isCancelled" color="grey" size="small" class="confirmed-icon">mdi-star-off</v-icon>
+
+          <!-- Confirmed details (location / time) -->
+          <div v-if="(day.isConfirmed || day.isCancelled) && day.confirmedEntry" class="confirmed-details text-caption">
+            <span v-if="day.confirmedEntry.location" class="d-block text-truncate">
+              <v-icon size="x-small" class="mr-1">mdi-map-marker</v-icon>{{ day.confirmedEntry.location }}
+            </span>
+            <span v-if="day.confirmedEntry.startTime" class="d-block">
+              <v-icon size="x-small" class="mr-1">mdi-clock</v-icon>{{ day.confirmedEntry.startTime }}<template v-if="day.confirmedEntry.endTime"> – {{ day.confirmedEntry.endTime }}</template>
+            </span>
+            <span v-if="day.confirmedEntry.rescheduledFrom" class="d-block text-caption text-warning">
+              Verschoben
+            </span>
+          </div>
+
+          <!-- Avatar stack — yes users (green) -->
+          <div class="avatar-stack" v-if="day.availableUsers.length > 0 || day.maybeUsers.length > 0">
             <UserAvatar
               v-for="u in day.availableUsers.slice(0, 3)"
               :key="u.userId"
               :username="u.username"
               :size="20"
             />
-            <span v-if="day.availableUsers.length > 3" class="text-caption more-count">
-              +{{ day.availableUsers.length - 3 }}
+            <UserAvatar
+              v-for="u in day.maybeUsers.slice(0, 2)"
+              :key="'m-' + u.userId"
+              :username="u.username"
+              :size="20"
+              style="opacity: 0.7; border: 1px solid rgb(var(--v-theme-warning));"
+            />
+            <span v-if="day.availableUsers.length + day.maybeUsers.length > 5" class="text-caption more-count">
+              +{{ day.availableUsers.length + day.maybeUsers.length - 5 }}
             </span>
           </div>
 
-          <!-- Count chip -->
-          <v-chip
-            v-if="day.availableUsers.length > 0"
-            size="x-small"
-            :color="day.meetsThreshold ? 'success' : 'secondary'"
-            class="count-chip"
-          >
-            {{ day.availableUsers.length }}
-          </v-chip>
+          <!-- Count chips -->
+          <div class="d-flex gap-1 flex-wrap" v-if="day.availableUsers.length > 0 || day.maybeUsers.length > 0">
+            <v-chip
+              v-if="day.availableUsers.length > 0"
+              size="x-small"
+              :color="day.meetsThreshold ? 'success' : 'secondary'"
+              class="count-chip"
+            >
+              {{ day.availableUsers.length }}
+            </v-chip>
+            <v-chip
+              v-if="day.maybeUsers.length > 0"
+              size="x-small"
+              color="warning"
+              variant="tonal"
+              class="count-chip"
+            >
+              ~{{ day.maybeUsers.length }}
+            </v-chip>
+          </div>
 
           <!-- Required blocked indicator -->
           <v-icon
-            v-if="day.requiredBlocked && day.availableUsers.length > 0 && !day.isPast"
+            v-if="day.requiredBlocked && (day.availableUsers.length > 0 || day.maybeUsers.length > 0) && !day.isPast"
             color="error"
             size="x-small"
             class="blocked-icon"
             title="Pflichtmitglied nicht verfügbar"
           >mdi-account-cancel</v-icon>
 
-          <!-- Confirm button (organizer/admin only) -->
+          <!-- Confirm button (organizer/admin only) — for unconfirmed days -->
           <v-btn
-            v-if="canConfirm && day.availableUsers.length > 0 && !day.isPast"
+            v-if="canConfirm && (day.availableUsers.length > 0 || day.maybeUsers.length > 0) && !day.isPast && !day.isConfirmed && !day.isBlocked"
             size="x-small"
-            :color="day.isConfirmed ? 'error' : 'success'"
+            color="success"
             variant="tonal"
             class="confirm-btn"
-            :disabled="!day.isConfirmed && day.requiredBlocked"
-            :title="!day.isConfirmed && day.requiredBlocked ? 'Pflichtmitglied nicht verfügbar' : undefined"
-            @click.stop="toggleConfirm(day.dateStr, day.isConfirmed)"
+            :disabled="day.requiredBlocked"
+            :title="day.requiredBlocked ? 'Pflichtmitglied nicht verfügbar' : undefined"
+            @click.stop="openConfirmDialog(day.dateStr)"
           >
-            {{ day.isConfirmed ? 'Unconfirm' : 'Confirm' }}
+            Confirm
+          </v-btn>
+
+          <!-- Cancel / Reschedule buttons for confirmed non-cancelled dates -->
+          <template v-if="canConfirm && day.isConfirmed && !day.isCancelled && !day.isPast">
+            <v-btn
+              size="x-small"
+              color="warning"
+              variant="tonal"
+              class="confirm-btn mt-1"
+              @click.stop="openRescheduleDialog(day.dateStr)"
+            >
+              <v-icon size="x-small" start>mdi-calendar-sync</v-icon>
+              Verschieben
+            </v-btn>
+            <v-btn
+              size="x-small"
+              color="error"
+              variant="tonal"
+              class="confirm-btn mt-1"
+              @click.stop="cancelDate(day.dateStr)"
+            >
+              <v-icon size="x-small" start>mdi-cancel</v-icon>
+              Absagen
+            </v-btn>
+          </template>
+
+          <!-- Uncancel for cancelled dates -->
+          <v-btn
+            v-if="canConfirm && day.isCancelled && !day.isPast"
+            size="x-small"
+            color="secondary"
+            variant="tonal"
+            class="confirm-btn mt-1"
+            @click.stop="openConfirmDialog(day.dateStr)"
+          >
+            Reaktivieren
           </v-btn>
         </div>
       </div>
@@ -97,7 +178,11 @@
     <div class="d-flex flex-wrap gap-3 mt-4">
       <div class="d-flex align-center gap-1 text-caption">
         <div class="legend-box available-legend"></div>
-        Du bist verfügbar
+        Ja (verfügbar)
+      </div>
+      <div class="d-flex align-center gap-1 text-caption">
+        <div class="legend-box maybe-legend"></div>
+        Vielleicht
       </div>
       <div class="d-flex align-center gap-1 text-caption">
         <div class="legend-box qualified-legend"></div>
@@ -107,30 +192,106 @@
         <div class="legend-box confirmed-legend"></div>
         Bestätigter Termin
       </div>
+      <div class="d-flex align-center gap-1 text-caption">
+        <div class="legend-box cancelled-legend"></div>
+        Abgesagt
+      </div>
+      <div class="d-flex align-center gap-1 text-caption">
+        <div class="legend-box blocked-legend"></div>
+        Nicht erlaubter Wochentag
+      </div>
+      <div class="d-flex align-center gap-1 text-caption">
+        <v-icon color="amber-lighten-2" size="small">mdi-church</v-icon>
+        Feiertag (NRW)
+      </div>
       <div v-if="requiredParticipantIds.length > 0" class="d-flex align-center gap-1 text-caption">
         <v-icon color="error" size="small">mdi-account-cancel</v-icon>
         Pflichtmitglied fehlt
       </div>
     </div>
+
+    <!-- Confirm Dialog -->
+    <ConfirmDateDialog
+      v-model="confirmDialogOpen"
+      :date="confirmDialogDate"
+      @confirm="handleConfirmDialogSave"
+    />
+
+    <!-- Reschedule Dialog -->
+    <RescheduleDateDialog
+      v-model="rescheduleDialogOpen"
+      :date="rescheduleDialogDate"
+      @reschedule="handleReschedule"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+interface ConfirmedDateEntry {
+  date: string
+  location: string
+  startTime: string
+  endTime: string
+  cancelled: boolean
+  rescheduledFrom: string | null
+  rescheduledTo: string | null
+}
+
+interface AvailabilityEntry {
+  userId: string
+  username: string
+  dates: string[]
+  maybeDates: string[]
+}
+
+interface HolidayEntry {
+  date: string
+  name: string
+}
+
 const props = defineProps<{
   eventId: string
   planningWindowWeeks: number
   minParticipants: number
   requiredParticipantIds: string[]
   canConfirm: boolean
-  availabilities: Array<{ userId: string; username: string; dates: string[] }>
-  confirmedDates: string[]
+  availabilities: AvailabilityEntry[]
+  confirmedDates: ConfirmedDateEntry[]
   currentUserId: string
+  allowedWeekdays?: number[]
+  dayExceptions?: string[]
 }>()
 
 const emit = defineEmits(['update:availabilities', 'confirm-date'])
 
-const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 const weekOffset = ref(0)
+
+// Confirm dialog state
+const confirmDialogOpen = ref(false)
+const confirmDialogDate = ref('')
+
+// Reschedule dialog state
+const rescheduleDialogOpen = ref(false)
+const rescheduleDialogDate = ref('')
+
+// Holidays
+const { data: holidays } = useFetch<HolidayEntry[]>('/api/holidays')
+const holidayMap = computed(() => {
+  const map: Record<string, string> = {}
+  for (const h of (holidays.value || [])) {
+    map[h.date] = h.name
+  }
+  return map
+})
+
+function isDateBlocked(dateStr: string, dayOfWeek: number): boolean {
+  const allowed = props.allowedWeekdays || []
+  if (allowed.length === 0) return false
+  const exceptions = props.dayExceptions || []
+  if (exceptions.includes(dateStr)) return false
+  return !allowed.includes(dayOfWeek)
+}
 
 function getStartDate(): Date {
   const today = new Date()
@@ -143,7 +304,7 @@ function getStartDate(): Date {
 const visibleWeeks = computed(() => {
   const start = getStartDate()
   const weeks = []
-  const numWeeks = Math.min(props.planningWindowWeeks, 4) // Show 4 at a time
+  const numWeeks = Math.min(props.planningWindowWeeks, 4)
 
   for (let w = 0; w < numWeeks; w++) {
     const week = []
@@ -155,26 +316,45 @@ const visibleWeeks = computed(() => {
       today.setHours(0, 0, 0, 0)
 
       const availableUsers = props.availabilities.filter(a => a.dates.includes(dateStr))
+      const maybeUsers = props.availabilities.filter(a => a.maybeDates?.includes(dateStr))
       const isCurrentUserAvailable = availableUsers.some(a => a.userId === props.currentUserId)
-      const isConfirmed = props.confirmedDates.includes(dateStr)
+      const isCurrentUserMaybe = !isCurrentUserAvailable && maybeUsers.some(a => a.userId === props.currentUserId)
+
+      const confirmedEntry = props.confirmedDates.find(c => c.date === dateStr)
+      const isConfirmed = !!confirmedEntry
+      const isCancelled = !!confirmedEntry?.cancelled
+
       const availableUserIds = availableUsers.map(a => a.userId)
       const requiredMissing = props.requiredParticipantIds.filter(id => !availableUserIds.includes(id))
       const requiredBlocked = requiredMissing.length > 0
-      const meetsThreshold = !requiredBlocked && availableUsers.length >= props.minParticipants
+      // meetsThreshold: yes + 0.5 * maybe >= minParticipants and required all have yes
+      const effectiveCount = availableUsers.length + 0.5 * maybeUsers.filter(u => !availableUserIds.includes(u.userId)).length
+      const meetsThreshold = !requiredBlocked && effectiveCount >= props.minParticipants
+
+      const isBlocked = isDateBlocked(dateStr, date.getDay())
+      const isHoliday = !!holidayMap.value[dateStr]
+      const holidayName = holidayMap.value[dateStr] || ''
 
       week.push({
         date,
         dateStr,
         dayNum: date.getDate(),
-        monthStr: date.toLocaleString('default', { month: 'short' }),
+        monthStr: date.toLocaleString('de-DE', { month: 'short' }),
         showMonth: date.getDate() === 1 || (w === 0 && d === 0),
         isToday: date.getTime() === today.getTime(),
         isPast: date < today,
         isCurrentUserAvailable,
+        isCurrentUserMaybe,
         isConfirmed,
+        isCancelled,
+        confirmedEntry: confirmedEntry || null,
         meetsThreshold,
         requiredBlocked,
         availableUsers,
+        maybeUsers: maybeUsers.filter(u => !availableUserIds.includes(u.userId)),
+        isBlocked,
+        isHoliday,
+        holidayName,
       })
     }
     weeks.push(week)
@@ -193,7 +373,7 @@ function formatDateRange(): string {
   const start = getStartDate()
   const end = new Date(start)
   end.setDate(start.getDate() + Math.min(props.planningWindowWeeks, 4) * 7 - 1)
-  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  return `${start.toLocaleDateString('de-DE', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('de-DE', { month: 'short', day: 'numeric', year: 'numeric' })}`
 }
 
 function prevWeeks() {
@@ -208,8 +388,26 @@ function toggleAvailability(dateStr: string) {
   emit('update:availabilities', dateStr)
 }
 
-function toggleConfirm(dateStr: string, isConfirmed: boolean) {
-  emit('confirm-date', { date: dateStr, remove: isConfirmed })
+function openConfirmDialog(dateStr: string) {
+  confirmDialogDate.value = dateStr
+  confirmDialogOpen.value = true
+}
+
+function openRescheduleDialog(dateStr: string) {
+  rescheduleDialogDate.value = dateStr
+  rescheduleDialogOpen.value = true
+}
+
+function handleConfirmDialogSave(data: { date: string; location: string; startTime: string; endTime: string }) {
+  emit('confirm-date', { date: data.date, location: data.location, startTime: data.startTime, endTime: data.endTime })
+}
+
+function cancelDate(dateStr: string) {
+  emit('confirm-date', { date: dateStr, cancel: true })
+}
+
+function handleReschedule(data: { oldDate: string; newDate: string }) {
+  emit('confirm-date', { date: data.oldDate, reschedule: true, newDate: data.newDate })
 }
 </script>
 
@@ -272,6 +470,11 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
   border-color: rgba(124, 77, 255, 0.5);
 }
 
+.day-maybe {
+  background: rgba(255, 165, 0, 0.15);
+  border-color: rgba(255, 165, 0, 0.4);
+}
+
 .day-qualified {
   background: rgba(76, 175, 80, 0.15);
   border-color: rgba(76, 175, 80, 0.4);
@@ -281,6 +484,23 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
   background: rgba(76, 175, 80, 0.3);
   border-color: rgba(76, 175, 80, 0.7);
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.day-cancelled {
+  background: rgba(100, 100, 100, 0.15);
+  border-color: rgba(150, 150, 150, 0.3);
+  opacity: 0.7;
+}
+
+.day-holiday {
+  border-color: rgba(255, 193, 7, 0.3) !important;
+}
+
+.day-blocked {
+  background: rgba(80, 80, 80, 0.08);
+  border-color: rgba(120, 120, 120, 0.15);
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .day-number {
@@ -299,10 +519,24 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
   right: 4px;
 }
 
-.blocked-icon {
+.holiday-icon {
   position: absolute;
   top: 4px;
   right: 24px;
+}
+
+.blocked-icon {
+  position: absolute;
+  top: 4px;
+  right: 44px;
+}
+
+.confirmed-details {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .avatar-stack {
@@ -324,6 +558,7 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
 .confirm-btn {
   margin-top: 4px;
   width: 100%;
+  font-size: 0.6rem;
 }
 
 .legend-box {
@@ -338,6 +573,11 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
   border-color: rgba(124, 77, 255, 0.6);
 }
 
+.maybe-legend {
+  background: rgba(255, 165, 0, 0.25);
+  border-color: rgba(255, 165, 0, 0.5);
+}
+
 .qualified-legend {
   background: rgba(76, 175, 80, 0.2);
   border-color: rgba(76, 175, 80, 0.5);
@@ -346,5 +586,15 @@ function toggleConfirm(dateStr: string, isConfirmed: boolean) {
 .confirmed-legend {
   background: rgba(76, 175, 80, 0.4);
   border-color: rgba(76, 175, 80, 0.8);
+}
+
+.cancelled-legend {
+  background: rgba(120, 120, 120, 0.2);
+  border-color: rgba(150, 150, 150, 0.4);
+}
+
+.blocked-legend {
+  background: rgba(80, 80, 80, 0.15);
+  border-color: rgba(120, 120, 120, 0.25);
 }
 </style>

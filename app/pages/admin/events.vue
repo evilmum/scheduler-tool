@@ -68,7 +68,7 @@
     </v-card>
 
     <!-- Add/Edit Dialog -->
-    <v-dialog v-model="dialog" max-width="650" scrollable>
+    <v-dialog v-model="dialog" max-width="700" scrollable>
       <v-card rounded="xl">
         <v-card-title class="pa-4">{{ editingEvent ? 'Edit Event' : 'Add Event' }}</v-card-title>
         <v-divider />
@@ -186,6 +186,97 @@
                 </template>
               </v-select>
             </v-col>
+
+            <!-- Feature 4: Discord Channel ID -->
+            <v-col cols="12">
+              <v-text-field
+                v-model="form.discordChannelId"
+                label="Discord Channel ID (optional, überschreibt globale Einstellung)"
+                prepend-inner-icon="mdi-discord"
+                variant="outlined"
+                density="comfortable"
+                hint="Leer lassen um die globale Discord-Channel-Einstellung zu verwenden."
+                persistent-hint
+              />
+            </v-col>
+
+            <!-- Feature 3: Allowed Weekdays -->
+            <v-col cols="12">
+              <div class="text-body-2 mb-2">Erlaubte Wochentage (leer = alle erlaubt)</div>
+              <v-btn-toggle
+                v-model="form.allowedWeekdays"
+                multiple
+                variant="outlined"
+                color="primary"
+                density="comfortable"
+              >
+                <v-btn :value="1" size="small">Mo</v-btn>
+                <v-btn :value="2" size="small">Di</v-btn>
+                <v-btn :value="3" size="small">Mi</v-btn>
+                <v-btn :value="4" size="small">Do</v-btn>
+                <v-btn :value="5" size="small">Fr</v-btn>
+                <v-btn :value="6" size="small">Sa</v-btn>
+                <v-btn :value="0" size="small">So</v-btn>
+              </v-btn-toggle>
+            </v-col>
+
+            <!-- Day Exceptions -->
+            <v-col cols="12">
+              <div class="text-body-2 mb-2">Ausnahme-Termine (immer erlaubt, auch wenn Wochentag gesperrt)</div>
+              <div class="d-flex gap-2 align-center mb-2">
+                <v-text-field
+                  v-model="newException"
+                  type="date"
+                  label="Datum hinzufügen"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  style="max-width: 200px"
+                />
+                <v-btn size="small" color="primary" variant="tonal" @click="addException" :disabled="!newException">
+                  <v-icon>mdi-plus</v-icon>
+                </v-btn>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <v-chip
+                  v-for="ex in form.dayExceptions"
+                  :key="ex"
+                  closable
+                  @click:close="removeException(ex)"
+                  size="small"
+                  color="info"
+                  variant="tonal"
+                >
+                  {{ ex }}
+                </v-chip>
+              </div>
+            </v-col>
+
+            <!-- Feature 6: Reminders -->
+            <v-col cols="12">
+              <v-divider class="mb-3" />
+              <div class="text-body-2 font-weight-medium mb-2">Erinnerungen</div>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-switch
+                v-model="form.reminderEnabled"
+                label="Erinnerungen aktivieren"
+                color="primary"
+                hide-details
+              />
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-slider
+                v-model="form.reminderDaysBefore"
+                label="Tage vorher erinnern"
+                :min="1"
+                :max="7"
+                :step="1"
+                thumb-label
+                color="warning"
+                :disabled="!form.reminderEnabled"
+              />
+            </v-col>
           </v-row>
           <v-alert v-if="dialogError" type="error" variant="tonal" density="compact" class="mt-3">
             {{ dialogError }}
@@ -235,6 +326,11 @@ interface EventType {
   notificationMethod: string
   createdAt: string
   archived: boolean
+  allowedWeekdays: number[]
+  dayExceptions: string[]
+  discordChannelId?: string
+  reminderEnabled: boolean
+  reminderDaysBefore: number
 }
 
 interface UserType {
@@ -252,20 +348,43 @@ const editingEvent = ref<EventType | null>(null)
 const deletingEvent = ref<EventType | null>(null)
 const saving = ref(false)
 const dialogError = ref('')
+const newException = ref('')
 
-const defaultForm = () => ({
+interface EventForm {
+  name: string
+  description: string
+  type: 'recurring' | 'one-time'
+  planningWindowWeeks: number
+  minParticipants: number
+  organizerId: string
+  participantIds: string[]
+  requiredParticipantIds: string[]
+  notificationMethod: string
+  allowedWeekdays: number[]
+  dayExceptions: string[]
+  discordChannelId: string
+  reminderEnabled: boolean
+  reminderDaysBefore: number
+}
+
+const defaultForm = (): EventForm => ({
   name: '',
   description: '',
-  type: 'recurring' as const,
+  type: 'recurring',
   planningWindowWeeks: 4,
   minParticipants: 2,
   organizerId: '',
-  participantIds: [] as string[],
-  requiredParticipantIds: [] as string[],
+  participantIds: [],
+  requiredParticipantIds: [],
   notificationMethod: 'none',
+  allowedWeekdays: [],
+  dayExceptions: [],
+  discordChannelId: '',
+  reminderEnabled: false,
+  reminderDaysBefore: 1,
 })
 
-const form = ref(defaultForm())
+const form = ref<EventForm>(defaultForm())
 
 const headers = [
   { title: 'Name', key: 'name', sortable: true },
@@ -276,7 +395,6 @@ const headers = [
 ]
 
 const userItems = computed(() => users.value.map(u => ({ title: u.username, value: u.id })))
-// Only allow selecting required participants from the already-chosen participants
 const participantItems = computed(() => {
   const ids = form.value.participantIds
   return users.value.filter(u => ids.includes(u.id)).map(u => ({ title: u.username, value: u.id }))
@@ -307,6 +425,7 @@ function getUserName(userId: string) {
 function openAddDialog() {
   editingEvent.value = null
   form.value = defaultForm()
+  newException.value = ''
   dialogError.value = ''
   dialog.value = true
 }
@@ -323,24 +442,46 @@ function openEditDialog(event: EventType) {
     participantIds: [...event.participantIds],
     requiredParticipantIds: [...(event.requiredParticipantIds || [])],
     notificationMethod: event.notificationMethod,
+    allowedWeekdays: [...(event.allowedWeekdays || [])],
+    dayExceptions: [...(event.dayExceptions || [])],
+    discordChannelId: event.discordChannelId || '',
+    reminderEnabled: event.reminderEnabled ?? false,
+    reminderDaysBefore: event.reminderDaysBefore ?? 1,
   }
+  newException.value = ''
   dialogError.value = ''
   dialog.value = true
+}
+
+function addException() {
+  if (newException.value && !form.value.dayExceptions.includes(newException.value)) {
+    form.value.dayExceptions.push(newException.value)
+    form.value.dayExceptions.sort()
+    newException.value = ''
+  }
+}
+
+function removeException(ex: string) {
+  form.value.dayExceptions = form.value.dayExceptions.filter(e => e !== ex)
 }
 
 async function saveEvent() {
   saving.value = true
   dialogError.value = ''
   try {
+    const payload = {
+      ...form.value,
+      discordChannelId: form.value.discordChannelId || undefined,
+    }
     if (editingEvent.value) {
       await $fetch(`/api/events/${editingEvent.value.id}`, {
         method: 'PUT',
-        body: form.value,
+        body: payload,
       })
     } else {
       await $fetch('/api/events', {
         method: 'POST',
-        body: form.value,
+        body: payload,
       })
     }
     dialog.value = false

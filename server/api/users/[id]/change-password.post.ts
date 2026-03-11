@@ -24,18 +24,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'User not found' })
   }
 
+  const user = users[idx]!
+
   // Non-admins must provide current password
   if (sessionUser.globalRole !== 'admin') {
     if (!currentPassword) {
       throw createError({ statusCode: 400, message: 'Current password is required' })
     }
-    const isValid = await bcrypt.compare(currentPassword, users[idx].passwordHash)
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash)
     if (!isValid) {
       throw createError({ statusCode: 401, message: 'Current password is incorrect' })
     }
   }
 
-  users[idx].passwordHash = await bcrypt.hash(newPassword, 10)
+  user.passwordHash = await bcrypt.hash(newPassword, 10)
   await saveUsers(users)
   return { success: true }
 })

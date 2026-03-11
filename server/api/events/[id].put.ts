@@ -12,10 +12,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Event not found' })
   }
 
-  const updatableFields = ['name', 'description', 'type', 'planningWindowWeeks', 'minParticipants', 'organizerId', 'participantIds', 'requiredParticipantIds', 'notificationMethod', 'archived']
+  const updatableFields = [
+    'name', 'description', 'type', 'planningWindowWeeks', 'minParticipants',
+    'organizerId', 'participantIds', 'requiredParticipantIds', 'notificationMethod',
+    'archived', 'allowedWeekdays', 'dayExceptions', 'discordChannelId',
+    'reminderEnabled', 'reminderDaysBefore',
+  ]
+  const target = events[idx] as unknown as Record<string, unknown>
   for (const field of updatableFields) {
     if (body[field] !== undefined) {
-      (events[idx] as Record<string, unknown>)[field] = body[field]
+      target[field] = body[field]
     }
   }
 

@@ -22,9 +22,10 @@ export default defineEventHandler(async (event) => {
     allowedFields.push('username', 'globalRole')
   }
 
+  const target = users[idx] as unknown as Record<string, unknown>
   for (const field of allowedFields) {
     if (body[field] !== undefined) {
-      (users[idx] as Record<string, unknown>)[field] = body[field]
+      target[field] = body[field]
     }
   }
 
