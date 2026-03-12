@@ -444,6 +444,12 @@ function handleReschedule(data: { oldDate: string; newDate: string }) {
   border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all 0.2s;
   cursor: default;
+  outline: none;
+}
+
+.calendar-day:focus,
+.calendar-day:focus-visible {
+  outline: none;
 }
 
 .day-clickable {
@@ -493,7 +499,7 @@ function handleReschedule(data: { oldDate: string; newDate: string }) {
 }
 
 .day-holiday {
-  border-color: rgba(255, 193, 7, 0.3) !important;
+  border-color: rgba(255, 193, 7, 0.3);
 }
 
 .day-blocked {

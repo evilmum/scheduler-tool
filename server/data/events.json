@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "mmmh1ye4d7ncjipklp",
+    "name": "Dragons of Stormwreck Isle",
+    "description": "",
+    "type": "recurring",
+    "planningWindowWeeks": 4,
+    "minParticipants": 2,
+    "organizerId": "mmmh05lhkisdkr1sjwe",
+    "participantIds": [
+      "mmmh0lhskhggzfws5e",
+      "mmmh05lhkisdkr1sjwe"
+    ],
+    "requiredParticipantIds": [],
+    "notificationMethod": "discord",
+    "createdAt": "2026-03-11T20:08:42.076Z",
+    "archived": false,
+    "allowedWeekdays": [
+      0
+    ],
+    "dayExceptions": [],
+    "discordChannelId": "1468006838141456517",
+    "reminderEnabled": true,
+    "reminderDaysBefore": 1
+  }
+]

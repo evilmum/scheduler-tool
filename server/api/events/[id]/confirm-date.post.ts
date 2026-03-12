@@ -95,11 +95,16 @@ export default defineEventHandler(async (event) => {
         .map(([userId]) => userId)
       const participants = allUsers.filter(u => availableUserIds.includes(u.id))
 
+      let notificationWarning: string | undefined
       try {
         await sendConfirmationNotification(dndEvent, date, participants, newEntry)
       } catch (e) {
+        notificationWarning = (e as Error).message
         console.error('Notification failed:', e)
       }
+
+      await saveConfirmedDates(confirmedDates)
+      return { success: true, confirmedDates: confirmedDates[id], notificationWarning }
     }
   }
 

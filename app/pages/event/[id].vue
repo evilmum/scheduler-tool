@@ -56,6 +56,18 @@
             <v-icon start size="small">mdi-history</v-icon>
             Historie
           </v-btn>
+
+          <!-- Edit button for organizer/admin -->
+          <v-btn
+            v-if="canConfirm"
+            variant="tonal"
+            color="primary"
+            size="small"
+            @click="editDialog = true"
+          >
+            <v-icon start size="small">mdi-pencil</v-icon>
+            Bearbeiten
+          </v-btn>
         </div>
       </div>
 
@@ -122,6 +134,19 @@
         </v-chip>
       </div>
 
+      <!-- Notification error -->
+      <v-alert
+        v-if="notificationError"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mb-4"
+        closable
+        @click:close="notificationError = ''"
+      >
+        <strong>Discord-Benachrichtigung fehlgeschlagen:</strong> {{ notificationError }}
+      </v-alert>
+
       <!-- Availability toggle hint -->
       <v-alert type="info" variant="tonal" density="compact" class="mb-4" icon="mdi-gesture-tap">
         Klicke auf einen Tag: einmal = <strong>Ja</strong> (verfügbar), zweimal = <strong>Vielleicht</strong>, dreimal = entfernen.
@@ -173,6 +198,15 @@
     </template>
 
     <v-alert v-else type="error" variant="tonal">Event not found</v-alert>
+
+    <!-- Edit Event Dialog -->
+    <EventEditDialog
+      v-model="editDialog"
+      :event-id="eventId"
+      :initial-data="event ? eventToFormData(event) : undefined"
+      :users="users"
+      @saved="loadData"
+    />
 
     <!-- Absences Dialog -->
     <v-dialog v-model="absencesDialog" max-width="600" scrollable>
@@ -334,6 +368,9 @@ const absenceEntries = ref<UserAbsenceEntry[]>([])
 // History dialog
 const historyDialog = ref(false)
 
+// Edit dialog
+const editDialog = ref(false)
+
 const canConfirm = computed(() =>
   isAdmin.value || event.value?.organizerId === currentUser.value?.id
 )
@@ -430,12 +467,17 @@ async function handleConfirmDate(payload: {
   startTime?: string
   endTime?: string
 }) {
-  const result = await $fetch<{ confirmedDates: ConfirmedDateEntry[] }>(`/api/events/${eventId}/confirm-date`, {
+  const result = await $fetch<{ confirmedDates: ConfirmedDateEntry[], notificationWarning?: string }>(`/api/events/${eventId}/confirm-date`, {
     method: 'POST',
     body: payload,
   })
   confirmedDates.value = result.confirmedDates
+  if (result.notificationWarning) {
+    notificationError.value = result.notificationWarning
+  }
 }
+
+const notificationError = ref('')
 
 async function openAbsencesDialog() {
   try {
@@ -459,5 +501,24 @@ function getUserName(userId: string): string {
 function formatDisplayDate(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00')
   return date.toLocaleDateString('de-DE', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function eventToFormData(e: EventType) {
+  return {
+    name: e.name,
+    description: e.description,
+    type: e.type,
+    planningWindowWeeks: e.planningWindowWeeks,
+    minParticipants: e.minParticipants,
+    organizerId: e.organizerId,
+    participantIds: [...e.participantIds],
+    requiredParticipantIds: [...(e.requiredParticipantIds || [])],
+    notificationMethod: e.notificationMethod,
+    allowedWeekdays: [...(e.allowedWeekdays || [])],
+    dayExceptions: [...(e.dayExceptions || [])],
+    discordChannelId: e.discordChannelId || '',
+    reminderEnabled: e.reminderEnabled ?? false,
+    reminderDaysBefore: e.reminderDaysBefore ?? 1,
+  }
 }
 </script>

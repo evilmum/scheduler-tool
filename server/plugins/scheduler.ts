@@ -1,4 +1,3 @@
-import cron from 'node-cron'
 import { getEvents, getConfirmedDates, getUsers, getSentReminders, saveSentReminders } from '../utils/db'
 import { sendReminderNotification } from '../utils/notifications'
 
@@ -52,10 +51,9 @@ async function checkAndSendReminders() {
 }
 
 export default defineNitroPlugin(() => {
-  // Run daily at 08:00
-  cron.schedule('0 8 * * *', async () => {
-    await checkAndSendReminders()
-  })
+  // Check once on startup, then every hour
+  checkAndSendReminders()
+  setInterval(checkAndSendReminders, 60 * 60 * 1000)
 
-  console.log('DnD Scheduler: Reminder cron job registered (daily at 08:00)')
+  console.log('DnD Scheduler: Reminder job registered (hourly check)')
 })

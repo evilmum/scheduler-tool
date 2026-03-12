@@ -2,17 +2,25 @@
   {
     "id": "1",
     "username": "admin",
-    "passwordHash": "$2b$10$5VmmSjnlOt/qW3sYq1FuNeH16Eg5P1v48dJEEqO/SOiZKoYm1azsW",
+    "passwordHash": "$2b$10$GMZ74t1BUojU/ZOFbqZYQugt63xVTXSACGX2QQOkNiqLxl7pjA2Jm",
     "email": "",
     "globalRole": "admin",
     "createdAt": "2024-01-01T00:00:00.000Z"
   },
   {
-    "id": "mmi8yka5e55smx51ts4",
+    "id": "mmmh05lhkisdkr1sjwe",
     "username": "Jonny",
-    "passwordHash": "$2b$10$zmkjDOUJQMusOXt7cXCydOAZTyabOH1raUG7r6MHLSgZI1Eo9iurC",
+    "passwordHash": "$2b$10$XJAtKVxJg8oP7QA7hpgVFevyM4mNSE1BPqiI.0RrK3k2jLu2clafC",
     "email": "rampage1712@googlemail.com",
     "globalRole": "admin",
-    "createdAt": "2026-03-08T21:11:02.189Z"
+    "createdAt": "2026-03-11T20:07:18.101Z"
+  },
+  {
+    "id": "mmmh0lhskhggzfws5e",
+    "username": "Léon",
+    "passwordHash": "$2b$10$U9KT0ZxQNIZfLLrjvvcW/OAK9Bkx.aV8VpZNAALmADJcnmKGmBTCa",
+    "email": "",
+    "globalRole": "user",
+    "createdAt": "2026-03-11T20:07:38.704Z"
   }
 ]
