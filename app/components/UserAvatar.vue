@@ -1,8 +1,8 @@
 <template>
   <v-tooltip :text="username" location="top">
-    <template #activator="{ props }">
+    <template #activator="{ props: tooltipProps }">
       <v-avatar
-        v-bind="props"
+        v-bind="{ ...tooltipProps, ...attrs }"
         :color="color"
         :size="size"
       >
@@ -13,6 +13,10 @@
 </template>
 
 <script setup lang="ts">
+import { useAttrs } from 'vue'
+defineOptions({ inheritAttrs: false })
+const attrs = useAttrs()
+
 const props = defineProps<{
   username: string
   size?: number | string

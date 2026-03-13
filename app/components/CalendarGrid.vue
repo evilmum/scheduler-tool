@@ -141,8 +141,10 @@
               :key="'m-' + u.userId"
               :username="u.username"
               :size="20"
-              style="opacity: 0; <!-- TODO, Border around username --> 
-              border: 1px solid rgb(var(--v-theme-warning))"
+              style="
+                opacity: 0.7;
+                border: 1px solid rgb(var(--v-theme-warning));
+              "
             />
             <span
               v-if="day.availableUsers.length + day.maybeUsers.length > 5"
